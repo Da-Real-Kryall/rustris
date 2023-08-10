@@ -71,8 +71,13 @@ fn game_loop(rx: Receiver<char>) {
         shape: current_block_bag[block_bag_index],
     };
     let mut old_block: Block = current_block;
-
-
+    let mut has_swapped: bool = false;
+    let mut swap_block: Block = Block {
+        x: 0,
+        y: 0,
+        rotation: 0,
+        shape: 7,
+    };
 
     let mut frame_number: u32 = 0;
     let mut score: u32 = 0;
@@ -130,6 +135,19 @@ fn game_loop(rx: Receiver<char>) {
             'e' => {
                 new_block.shape = (new_block.shape + 1) % 7;
             },
+            'c' => {
+                if !has_swapped {
+                    current_block.x = 3;
+                    current_block.y = 0;
+                    current_block.rotation = 0;
+                    has_swapped = true;
+                    frame_number = LEVEL_GRAVITY[level];
+                    new_block.shape = swap_block.shape;
+                    swap_block.shape = current_block.shape;
+                    current_block.shape = new_block.shape;
+                    update_hold_block_graphics(swap_block.shape, &mut stdout)
+                }
+            },
             ' ' => {
                 while check_transform(board, new_block) {
                     new_block.y += 1;
@@ -141,6 +159,8 @@ fn game_loop(rx: Receiver<char>) {
 
             },
         };
+
+
         if check_transform(board, new_block) {
             current_block = new_block;
         };
@@ -148,10 +168,13 @@ fn game_loop(rx: Receiver<char>) {
         if frame_number >= LEVEL_GRAVITY[level] {
             frame_number = 0;
             new_block = current_block;
-
+            
             //lock block if it can't move down
             new_block.y += 1;
             if !check_transform(board, new_block) {
+                if new_block.shape != 7 {
+                    has_swapped = false;
+                }
                 board = lock_block(board, current_block);
                 block_bag_index += 1;
 

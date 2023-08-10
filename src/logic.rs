@@ -13,6 +13,9 @@ pub(crate) fn check_transform(
     board: [[u16; 10]; 24],
     new_block: Block
 ) -> bool {
+    if new_block.shape == 7 {
+        return false;
+    }
     for dy in 0..4 {
         for dx in 0..4 {
             if BLOCKS[new_block.shape][new_block.rotation][dy as usize][dx as usize] != 0 {
@@ -34,6 +37,9 @@ pub(crate) fn check_transform(
 
 //returns the new board
 pub(crate) fn lock_block(board: [[u16; 10]; 24], block: Block) -> [[u16; 10]; 24] {
+    if block.shape == 7 {
+        return board;
+    }
     let mut board = board;
     for dy in 0..4 {
         for dx in 0..4 {
