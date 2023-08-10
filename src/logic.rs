@@ -4,7 +4,7 @@ use crate::consts::*;
 use crate::draw::*;
 use rand::{ Rng, rngs::ThreadRng };
 use termion::input::MouseTerminal;
-use std::{thread, io::Write};
+use std::thread;
 
 
 
@@ -54,55 +54,6 @@ pub(crate) fn lock_block(board: [[u16; 10]; 24], block: Block) -> [[u16; 10]; 24
                         128       4        64
 
                     ]*/
-                    /*
-                                    //top left neighbour
-                if dy > 0 && dx > 0 {
-                    if BLOCKS[block.shape][block.rotation][dy as usize - 1][dx as usize - 1] as u16 != 0 {
-                        key += 16;
-                    }
-                }
-                //top neighbour
-                if dy > 0 {
-                    if BLOCKS[block.shape][block.rotation][dy as usize - 1][dx as usize] as u16 != 0 {
-                        key += 1;
-                    }
-                }
-                //top right neighbour
-                if dy > 0 && dx < 3 {
-                    if BLOCKS[block.shape][block.rotation][dy as usize - 1][dx as usize + 1] as u16 != 0 {
-                        key += 32;
-                    }
-                }
-                //right neighbour
-                if dx < 3 {
-                    if BLOCKS[block.shape][block.rotation][dy as usize][dx as usize + 1] as u16 != 0 {
-                        key += 2;
-                    }
-                }
-                //bottom right neighbour
-                if dy < 3 && dx < 3 {
-                    if BLOCKS[block.shape][block.rotation][dy as usize + 1][dx as usize + 1] as u16 != 0 {
-                        key += 64;
-                    }
-                }
-                //bottom neighbour
-                if dy < 3 {
-                    if BLOCKS[block.shape][block.rotation][dy as usize + 1][dx as usize] as u16 != 0 {
-                        key += 4;
-                    }
-                }
-                //bottom left neighbour
-                if dy < 3 && dx > 0 {
-                    if BLOCKS[block.shape][block.rotation][dy as usize + 1][dx as usize - 1] as u16 != 0 {
-                        key += 128;
-                    }
-                }
-                //left neighbour
-                if dx > 0 {
-                    if BLOCKS[block.shape][block.rotation][dy as usize][dx as usize - 1] as u16 != 0 {
-                        key += 8;
-                    }
-                } */
                     let mut key = 0b00000000;
                     //top left neighbour
                     if dy > 0 && dx > 0 {
@@ -192,11 +143,8 @@ pub(crate) fn clear_lines(
     stdout: &mut MouseTerminal<termion::raw::RawTerminal<std::io::Stdout>>,
     board: &mut [[u16; 10]; 24],
     block: Block,
-    //old_key_buffer_grid: &mut [[u16; 10]; 24]
 ) -> u32 {
-    //update_graphics(board, current_block, &mut stdout);
-    //let mut new_old_key_buffer_grid: [[u16; 10]; 24] = [[0; 10]; 24];
-    let mut old_board = board.clone();
+    let mut old_board: [[u16; 10]; 24];
     let mut lines_cleared: u32 = 0;
     for i in 1..board.len() {
         let mut is_full: bool = true;
@@ -227,7 +175,7 @@ pub(crate) fn clear_lines(
                     board[k][l] = board[k-1][l];
                 }
             }
-            update_graphics(*board, old_board, block, block, stdout);
+            update_board_graphics(*board, old_board, block, block, stdout);
             thread::sleep(std::time::Duration::from_millis(64));
         }
     }

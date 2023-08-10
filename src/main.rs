@@ -111,10 +111,10 @@ fn game_loop(rx: Receiver<char>) {
                             NORMAL_KICKS
                         }[current_block.rotation][i][1] as usize;
 
-                    new_block.rotation = (current_block.rotation + 1) % 4;
-                    if check_transform(board, new_block) {
-                        break;
-                    }
+                        new_block.rotation = (current_block.rotation + 1) % 4;
+                        if check_transform(board, new_block) {
+                            break;
+                        }
                 }
                 //new_block.rotation = (curr_block.rotation + 1) % 4;
             },
@@ -155,8 +155,8 @@ fn game_loop(rx: Receiver<char>) {
                 board = lock_block(board, current_block);
                 block_bag_index += 1;
 
-                if block_bag_index >= 6 {
-                    current_block_bag = next_block_bag;
+                if block_bag_index == 7 {
+                    current_block_bag = next_block_bag.clone();
                     next_block_bag = create_shuffled_bag(&mut rng);
                     block_bag_index = 0;
                 };
@@ -166,6 +166,7 @@ fn game_loop(rx: Receiver<char>) {
                     rotation: 0,
                     shape: current_block_bag[block_bag_index]
                 };
+                update_next_blocks_graphics(current_block_bag, next_block_bag, block_bag_index, &mut stdout);
             } else {
                 current_block = new_block;
             }
@@ -173,7 +174,7 @@ fn game_loop(rx: Receiver<char>) {
         score += clear_lines(&mut stdout, &mut board, current_block);
 
         if board != old_board || current_block != old_block {
-            update_graphics(board, old_board, current_block, old_block, &mut stdout);
+            update_board_graphics(board, old_board, current_block, old_block, &mut stdout);
         };
 
         old_block = current_block;
