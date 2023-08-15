@@ -1,4 +1,6 @@
+#![allow(arithmetic_overflow)]
 
+//allow attempts to subtract with overflow to wrap around
 mod draw;
 use draw::*;
 
@@ -41,19 +43,28 @@ fn main() {
 fn game_loop(rx: Receiver<char>) {
     //setup
     let mut stdout = MouseTerminal::from(stdout().into_raw_mode().unwrap());
-    let mut print_buffer: String = String::new();
-    print_buffer.push_str(&format!(
-        "{}",
+    //clear screen and hide cursor and move cursor to top left
+    stdout.write_all(&format!(
+        "\x1b[2J\x1b[?25l{}",
         Goto(1,1)
-    ));
-    //clear screen
-    print_buffer.push_str("\x1b[2J");
-    print_buffer.push_str(START_GUI);
+    ).as_bytes()).unwrap();
+    stdout.flush().unwrap();
 
-    //hide cursor
-    print_buffer.push_str("\x1b[?25l");
-
-    stdout.write_all(print_buffer.as_bytes()).unwrap();
+    let mut graphics_buffer: [[(char, u8, u8); DRAW_GRID_SIZE[0]]; DRAW_GRID_SIZE[1]] = [[(' ', 0, 0); DRAW_GRID_SIZE[0]]; DRAW_GRID_SIZE[1]];
+    let mut old_graphics_buffer: [[(char, u8, u8); DRAW_GRID_SIZE[0]]; DRAW_GRID_SIZE[1]] = [[(' ', 0, 0); DRAW_GRID_SIZE[0]]; DRAW_GRID_SIZE[1]];
+    let mut index = 0;
+    for character in START_GUI.chars() {
+        if character == '\n' {
+            continue;
+        }
+        //println!("\r{}, {}, {}, '{}'", index, index / DRAW_GRID_SIZE[0], index % DRAW_GRID_SIZE[0], character);
+        graphics_buffer[index / DRAW_GRID_SIZE[0]][index % DRAW_GRID_SIZE[0]] = (character, 255, 0);
+        index += 1;
+    }
+    update_graphics_from_buffer(graphics_buffer, old_graphics_buffer, &mut stdout);
+    
+    let mut print_buffer: String = String::new();
+     
 
     let mut rng: ThreadRng =  thread_rng();
 
@@ -80,7 +91,7 @@ fn game_loop(rx: Receiver<char>) {
     };
 
     let mut frame_number: u32 = 0;
-    let mut score: u32 = 0;
+    //let mut score: u32 = 0;
     let level: usize = 0;
 
 
@@ -132,22 +143,34 @@ fn game_loop(rx: Receiver<char>) {
             'd' => {
                 new_block.x += 1;
             },
+            'c' => {
+                if !has_swapped {
+                    
+                    has_swapped = true;
+                    frame_number = LEVEL_GRAVITY[level];
+                    
+                    new_block.shape = swap_block.shape;
+                    swap_block.shape = current_block.shape;
+                    
+                    current_block = Block {
+                        x: 3,
+                        y: 0,
+                        rotation: 0,
+                        shape: new_block.shape
+                    };
+                    update_hold_block_graphics(swap_block.shape, &mut graphics_buffer);
+                }
+            },
             'e' => {
                 new_block.shape = (new_block.shape + 1) % 7;
             },
-            'c' => {
-                if !has_swapped {
-                    current_block.x = 3;
-                    current_block.y = 0;
-                    current_block.rotation = 0;
-                    has_swapped = true;
-                    frame_number = LEVEL_GRAVITY[level];
-                    new_block.shape = swap_block.shape;
-                    swap_block.shape = current_block.shape;
-                    current_block.shape = new_block.shape;
-                    update_hold_block_graphics(swap_block.shape, &mut stdout)
-                }
-            },
+            'r' => {
+                stdout.write_all(&format!(
+                    "\x1b[2J\x1b[?25l{}",
+                    Goto(1,1)
+                ).as_bytes()).unwrap();
+                stdout.flush().unwrap();
+            }
             ' ' => {
                 while check_transform(board, new_block) {
                     new_block.y += 1;
@@ -156,7 +179,6 @@ fn game_loop(rx: Receiver<char>) {
                 frame_number = LEVEL_GRAVITY[level];
             },
             _ => {
-
             },
         };
 
@@ -172,7 +194,7 @@ fn game_loop(rx: Receiver<char>) {
             //lock block if it can't move down
             new_block.y += 1;
             if !check_transform(board, new_block) {
-                if new_block.shape != 7 {
+                if new_block.shape <= 6 {
                     has_swapped = false;
                 }
                 board = lock_block(board, current_block);
@@ -189,20 +211,23 @@ fn game_loop(rx: Receiver<char>) {
                     rotation: 0,
                     shape: current_block_bag[block_bag_index]
                 };
-                update_next_blocks_graphics(current_block_bag, next_block_bag, block_bag_index, &mut stdout);
+                update_next_blocks_graphics(current_block_bag, next_block_bag, block_bag_index, &mut graphics_buffer);
             } else {
                 current_block = new_block;
             }
         }
-        score += clear_lines(&mut stdout, &mut board, current_block);
+        //score += 
+        clear_lines(&mut graphics_buffer, &mut board, current_block);
 
         if board != old_board || current_block != old_block {
-            update_board_graphics(board, old_board, current_block, old_block, &mut stdout);
+            update_board_graphics_buffer(board, old_board, current_block, old_block, &mut graphics_buffer);
         };
 
         old_block = current_block;
         old_board = board;
         
+        update_graphics_from_buffer(graphics_buffer, old_graphics_buffer, &mut stdout);
+        old_graphics_buffer = graphics_buffer.clone();
         thread::sleep(std::time::Duration::from_millis(16));
     }
 }

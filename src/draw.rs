@@ -1,16 +1,13 @@
-
+#![allow(arithmetic_overflow)]
 extern crate termion;
 use std::io::Write;
-use termion::{
-    cursor::Goto,
-    input::MouseTerminal
-};
+use termion::input::MouseTerminal;
 
 use crate::{consts::*, logic::check_transform};
 
 //alt is the numbers that correlate to the characters
 
-pub(crate) fn get_alt(neighbours: u8) -> [u8; 6] {
+fn get_alt(neighbours: u8) -> [u8; 6] {
     /*
      [0, 1, 2,
       3, 4, 5]
@@ -66,75 +63,50 @@ pub(crate) fn get_alt(neighbours: u8) -> [u8; 6] {
     return block_alt;
 }
 
+fn apply_alt_to_graphics_buffer(alt: [u8; 6], colour: u8, x: u8, y: u8, draw_offset: [u8; 2], graphics_buffer: &mut [[(char, u8, u8); DRAW_GRID_SIZE[0]]; DRAW_GRID_SIZE[1]]) {
+    if colour == 9 {
+        return;
+    }
 
-fn format_alt_to_string(alt: [u8; 6], colour: u8, x: u8, y: u8, fine_draw_offset: [u16; 2]) -> String {
-    let mut res_string: String = String::new();
-    
-    res_string.push_str(&format!(
-        "{}",
-        Goto(x as u16 * 3 + 1 + fine_draw_offset[0], y as u16 * 2 + 1 + fine_draw_offset[1])
-    ));
-    //push three of the same character to make it look square
-    res_string.push_str(&format!(
-        "{}",
-        //the foreground is a slightly darker version of the background
-        match colour {                           //inside, edge
+
+    let mut res: [(char, u8, u8); 6] = [(' ', 0, 0); 6];
+
+    for i in 0..6 {
+        let col: (u8, u8) = match colour { //inside, edge
             // I cyan      
-            0 => {format!("\x1b[38;5;{};48;5;{}m", 87, 45)},
+            0 => (87, 45),
             // O yellow
-            1 => {format!("\x1b[38;5;{};48;5;{}m", 226, 220)},
+            1 => (226, 220),
             // T magenta
-            2 => {format!("\x1b[38;5;{};48;5;{}m", 129, 128)},
+            2 => (129, 128),
             // Z red
-            3 => {format!("\x1b[38;5;{};48;5;{}m", 196, 160)},
+            3 => (196, 160),
             // S green
-            4 => {format!("\x1b[38;5;{};48;5;{}m", 118, 46)},
+            4 => (118, 46),
             // J cobalt
-            5 => {format!("\x1b[38;5;{};48;5;{}m", 20, 19)},
+            5 => (20, 19),
             // L orange
-            6 => {format!("\x1b[38;5;{};48;5;{}m", 208, 202)},
+            6 => (208, 202),
             //ghost block
-            7 => {format!("\x1b[38;5;{};48;5;{}m", 238, 237)},
+            7 => (238, 237),
             // empty
-            _ => {format!("\x1b[38;5;{};48;5;{}m", 255, 0)},
-        },
-    ));
-
-
-    //let alt: [u8; 6] = {
-    //    if colour == 7 {
-    //        [18; 6]
-    //    } else {
-    //        alt
-    //    }
-    //};
-
-
-    res_string.push_str(&format!(
-        "{}{}{}",//lol i'll compress this later
-        CHARREF[alt[0] as usize],
-        CHARREF[alt[1] as usize],
-        CHARREF[alt[2] as usize]
-    ));
-
-    res_string.push_str(&format!(
-        "{}",
-        Goto(x as u16 * 3 + 1 + fine_draw_offset[0], y as u16 * 2 + 2 + fine_draw_offset[1])
-    ));
-    res_string.push_str(&format!(
-        "{}{}{}",
-        CHARREF[alt[3] as usize],
-        CHARREF[alt[4] as usize],
-        CHARREF[alt[5] as usize]
-    ));
-    //res_string.push_str(format!("\x1b[0m").as_str());
-    return res_string;
+            8 => (0, 0),
+            // nothing,
+            _ => (0, 0),
+        };
+        res[i] = (CHARREF[alt[i] as usize], col.0, col.1);
+    }
+    for i in 0..3 {
+        graphics_buffer[(y * 2 + draw_offset[1]) as usize][(x * 3 + draw_offset[0]) as usize + i] = res[i];
+    }
+    for i in 0..3 {
+        graphics_buffer[(y * 2 + draw_offset[1]) as usize + 1][(x * 3 + draw_offset[0]) as usize + i] = res[i + 3];
+    }
+    
 }
+    
 
-
-
-
-pub(crate) fn get_block_key_grid(block: Block, ghost: bool) -> [[u16; 4]; 4] {
+fn get_block_key_grid(block: Block, ghost: bool) -> [[u16; 4]; 4] {
     let mut key_grid: [[u16; 4]; 4] = [[0; 4]; 4];
     for dy in 0..4 {
         for dx in 0..4 {
@@ -207,7 +179,8 @@ pub(crate) fn get_block_key_grid(block: Block, ghost: bool) -> [[u16; 4]; 4] {
     return key_grid;
 }
 
-pub(crate) fn create_key_buffer_grid(board: [[u16; 10]; 24], block: Block) -> [[u16; 10]; 24] {
+
+fn create_key_buffer_grid(board: [[u16; 10]; 24], block: Block) -> [[u16; 10]; 24] {
 
     
     //make draw buffer grid (a 2d array of the characters being printed to the larger board))
@@ -253,32 +226,54 @@ pub(crate) fn create_key_buffer_grid(board: [[u16; 10]; 24], block: Block) -> [[
     return key_buffer_grid;
 }
 
+pub(crate) fn update_graphics_from_buffer(
+    graphics_buffer: [[(char, u8, u8); DRAW_GRID_SIZE[0]]; DRAW_GRID_SIZE[1]],
+    old_graphics_buffer: [[(char, u8, u8); DRAW_GRID_SIZE[0]]; DRAW_GRID_SIZE[1]],
+    stdout: &mut MouseTerminal<termion::raw::RawTerminal<std::io::Stdout>>
+) {
+    //apply buffer grid to print buffer
+    let mut print_buffer: String = String::new();
 
-/* returns the key_buffer_grid */
-pub(crate) fn update_board_graphics(
+    for row_index in 0..graphics_buffer.len() { 
+        for col_index in 0..graphics_buffer[row_index].len() {
+            let (character, colour, background) = graphics_buffer[row_index][col_index];
+            let (old_character, old_colour, old_background) = old_graphics_buffer[row_index][col_index];
+            if character != old_character || colour != old_colour || background != old_background {
+                print_buffer += &format!(
+                    "{}{}{}",
+                    termion::cursor::Goto(1+col_index as u16, 1+row_index as u16),
+                    format!("\x1b[38;5;{};48;5;{}m", colour, background),
+                    character
+                );
+            }
+        }
+    }
+
+    stdout.write_all(print_buffer.as_bytes()).unwrap();
+    stdout.flush().unwrap();
+}
+
+
+pub(crate) fn update_board_graphics_buffer(
     board: [[u16; 10]; 24],
     old_board: [[u16; 10]; 24],
     block: Block,
     old_block: Block,
-    stdout: &mut MouseTerminal<termion::raw::RawTerminal<std::io::Stdout>>
+    graphics_buffer: &mut [[(char, u8, u8); DRAW_GRID_SIZE[0]]; DRAW_GRID_SIZE[1]]
 )
  {
 
     let key_buffer_grid = create_key_buffer_grid(board, block);
     let old_key_buffer_grid = create_key_buffer_grid(old_board, old_block);
 
-
-    //apply buffer grid to print buffer
-    let mut print_buffer: String = String::new();
-
     for row_index in 0..key_buffer_grid.len() { 
         for col_index in 0..key_buffer_grid[row_index].len() {
             let key = key_buffer_grid[row_index][col_index];
             let old_key = old_key_buffer_grid[row_index][col_index];
             if key != old_key {
-                //continue;//key = 0b0000001011111111;
-                let neighbours = key; //& 0b11111111;
+                let neighbours = key;
                 let colour = key >> 8;
+
                 let alt: [u8; 6] = {
                     if colour != 0 {
                         get_alt(neighbours as u8)
@@ -286,71 +281,80 @@ pub(crate) fn update_board_graphics(
                         [0; 6]
                     }
                 };
-                print_buffer.push_str(format_alt_to_string(alt, colour as u8 - 1, col_index as u8, row_index as u8, [DRAW_OFFSET[0],DRAW_OFFSET[1]]).as_str());
+                apply_alt_to_graphics_buffer(alt, colour as u8 - 1, col_index as u8, row_index as u8, [DRAW_OFFSET[0],DRAW_OFFSET[1]], graphics_buffer)
             }
-
         }
     }
-    stdout.write_all(print_buffer.as_bytes()).unwrap();
-    stdout.flush().unwrap();
 }
+
 
 pub(crate) fn update_hold_block_graphics(
     hold_block: usize,
-    stdout: &mut MouseTerminal<termion::raw::RawTerminal<std::io::Stdout>>
+    graphics_buffer: &mut [[(char, u8, u8); DRAW_GRID_SIZE[0]]; DRAW_GRID_SIZE[1]]
 ) {
-    let mut print_buffer: String = "\x1b[38;5;255;48;5;0m".to_string();
-    let fine_draw_offset = [DRAW_OFFSET[0] - 11, DRAW_OFFSET[1] + 3];
-    //clear the hold block area
-    for y in 0..8 { //+19
-        print_buffer.push_str(&format!("{}{}", termion::cursor::Goto(fine_draw_offset[0]+1, y+fine_draw_offset[1]), " ".repeat(9)));
-    }
+    let mut fine_draw_offset = [DRAW_OFFSET[0] - 11, DRAW_OFFSET[1] + 2];
 
-    if hold_block != 0 {
-        let key_grid = get_block_key_grid({Block {
-            x: 0,
-            y: 0,
-            rotation: 0,
-            shape: hold_block,
-        }}, false);
-        for dy in 0..4 {
-            for dx in 0..4 {
-                if key_grid[dy as usize][dx as usize] != 0 {
-                    let key = key_grid[dy as usize][dx as usize];
-                    let neighbours = key; //& 0b11111111;
-                    let colour = key >> 8;
-                    let alt: [u8; 6] = {
-                        if colour != 0 {
-                            get_alt(neighbours as u8)
-                        } else {
-                            [0; 6]
-                        }
-                    };
-                    print_buffer.push_str(format_alt_to_string(alt, colour as u8 - 1, dx as u8, dy as u8, fine_draw_offset).as_str());
-                }
-            }
+    for x in 0..9 {
+        for y in 0..8 {
+            graphics_buffer[fine_draw_offset[1] as usize + y as usize][fine_draw_offset[0] as usize + x as usize] = (' ', 0, 0);
         }
     }
 
-    stdout.write_all(print_buffer.as_bytes()).unwrap();
-    stdout.flush().unwrap();
+    let key_grid = get_block_key_grid({Block {
+        x: 0,
+        y: 0,
+        shape: hold_block,
+        rotation: match hold_block {
+            0 => 1,
+            _ => 0,
+        },
+    }}, false);
+
+    if hold_block == 1 {
+        fine_draw_offset[0] -= 1;
+    } else if hold_block == 0 {
+        fine_draw_offset[0] -= 3;
+    }
+    for dy in 0..4 {
+        for dx in 0..4 {
+            let key = key_grid[dy as usize][dx as usize];
+            let neighbours = key;
+            let mut colour = key >> 8;
+            let alt: [u8; 6] = {
+                if colour != 0 {
+                    get_alt(neighbours as u8)
+                } else {
+                    colour = 10;
+                    [0; 6]
+                }
+            };
+            apply_alt_to_graphics_buffer(alt, colour as u8 - 1, dx as u8, dy as u8, fine_draw_offset, graphics_buffer)
+        }
+    }
 }
+
 
 pub(crate) fn update_next_blocks_graphics(
     current_block_bag: [usize; 7],
     next_block_bag: [usize; 7],
     block_bag_index: usize,
-    stdout: &mut MouseTerminal<termion::raw::RawTerminal<std::io::Stdout>>
+    graphics_buffer: &mut [[(char, u8, u8); DRAW_GRID_SIZE[0]]; DRAW_GRID_SIZE[1]]
 ) {
-    let mut print_buffer: String = "\x1b[38;5;255;48;5;0m".to_string();
-    let mut fine_draw_offset: [u16; 2] = [32+DRAW_OFFSET[0],DRAW_OFFSET[1]];
-
-    //clear the next blocks area
-    for y in 0..22 { //+19
-        print_buffer.push_str(&format!("{}{}", termion::cursor::Goto(fine_draw_offset[0]+1, fine_draw_offset[1]+y+3), " ".repeat(9)));
+    
+    //clear next blocks area
+    let mut fine_draw_offset: [u8; 2] = [30+DRAW_OFFSET[0],2+DRAW_OFFSET[1]];
+    for y in 0..11 {
+        for x in 1..=2 {
+            graphics_buffer[(2*y+fine_draw_offset[1]) as usize][x+fine_draw_offset[0] as usize] = (' ', 0, 0);
+            graphics_buffer[(2*y+fine_draw_offset[1]) as usize+1][x+fine_draw_offset[0] as usize] = (' ', 0, 0);
+        }
+        for x in 1..4 {
+            apply_alt_to_graphics_buffer([0,0,0,0,0,0], 8, x, y, fine_draw_offset, graphics_buffer);
+        }
     }
+    fine_draw_offset = [32+DRAW_OFFSET[0],DRAW_OFFSET[1]];
 
-    for i in 1..4 { //8
+    for i in 1..4 {
         let mut block: Block = Block {
             x: 0,
             y: 0,
@@ -373,22 +377,20 @@ pub(crate) fn update_next_blocks_graphics(
 
         let key_grid = get_block_key_grid(block, false);
         
-
-        
         for dy in 0..4 {
             for dx in 0..4 {
-                if key_grid[dy as usize][dx as usize] != 0 {
-                    let neighbours = key_grid[dy as usize][dx as usize]; //& 0b11111111;
-                    let colour = key_grid[dy as usize][dx as usize] >> 8;
-                    let alt: [u8; 6] = {
-                        if colour != 0 {
-                            get_alt(neighbours as u8)
-                        } else {
-                            [0; 6]
-                        }
-                    };
-                    print_buffer.push_str(format_alt_to_string(alt, colour as u8 - 1, dx as u8, dy as u8, fine_draw_offset).as_str());
-                }
+                let key = key_grid[dy as usize][dx as usize];
+                let neighbours = key;
+                let mut colour = key >> 8;
+                let alt: [u8; 6] = {
+                    if colour != 0 {
+                        get_alt(neighbours as u8)
+                    } else {
+                        colour = 10;
+                        [0; 6]
+                    }
+                };
+                apply_alt_to_graphics_buffer(alt, colour as u8 - 1, dx as u8, dy as u8, fine_draw_offset, graphics_buffer)
             }
         }
         fine_draw_offset[1] += 5;
@@ -399,7 +401,4 @@ pub(crate) fn update_next_blocks_graphics(
             fine_draw_offset[0] += 1;
         }
     }
-
-    stdout.write_all(print_buffer.as_bytes()).unwrap();
-    stdout.flush().unwrap();
 }

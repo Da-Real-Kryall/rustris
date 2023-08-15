@@ -8,3 +8,8 @@ edition = "2021"
 [dependencies]
 termion = "*"
 rand = "0.7.3"
+
+
+
+[profile.dev]
+overflow-checks = false

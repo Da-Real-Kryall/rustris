@@ -3,7 +3,6 @@
 use crate::consts::*;
 use crate::draw::*;
 use rand::{ Rng, rngs::ThreadRng };
-use termion::input::MouseTerminal;
 use std::thread;
 
 
@@ -13,7 +12,7 @@ pub(crate) fn check_transform(
     board: [[u16; 10]; 24],
     new_block: Block
 ) -> bool {
-    if new_block.shape == 7 {
+    if new_block.shape > 6 {
         return false;
     }
     for dy in 0..4 {
@@ -37,7 +36,7 @@ pub(crate) fn check_transform(
 
 //returns the new board
 pub(crate) fn lock_block(board: [[u16; 10]; 24], block: Block) -> [[u16; 10]; 24] {
-    if block.shape == 7 {
+    if block.shape > 6 {
         return board;
     }
     let mut board = board;
@@ -146,7 +145,7 @@ pub(crate) fn create_shuffled_bag(rng: &mut ThreadRng) -> [usize; 7] {
 
 ]*/
 pub(crate) fn clear_lines(
-    stdout: &mut MouseTerminal<termion::raw::RawTerminal<std::io::Stdout>>,
+    graphics_buffer: &mut [[(char, u8, u8); DRAW_GRID_SIZE[0]]; DRAW_GRID_SIZE[1]],
     board: &mut [[u16; 10]; 24],
     block: Block,
 ) -> u32 {
@@ -181,7 +180,7 @@ pub(crate) fn clear_lines(
                     board[k][l] = board[k-1][l];
                 }
             }
-            update_board_graphics(*board, old_board, block, block, stdout);
+            update_board_graphics_buffer(*board, old_board, block, block, graphics_buffer);
             thread::sleep(std::time::Duration::from_millis(64));
         }
     }
